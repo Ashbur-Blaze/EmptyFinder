@@ -1,5 +1,8 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
+
+namespace EmptyFinderPractice;
 
 class Program
 {
@@ -7,40 +10,105 @@ class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("用法：EmptyFinder <文件夹路径>");
+            Console.WriteLine("用法: EmptyFinderPractice <文件夹路径>");
             return;
         }
 
         string path = args[0];
-        int count = FindEmptyFiles(path);
-        Console.WriteLine($"共找到 {count} 个空文件");
+        List<string> emptyFiles = FindEmptyFiles(path);
+
+        Console.WriteLine();
+        foreach (string file in emptyFiles)
+        {
+            Console.WriteLine(file);
+        }
+        Console.WriteLine($"共找到 {emptyFiles.Count} 个空文件");
+
+        if (emptyFiles.Count == 0)
+        {
+            return;
+        }
+
+        Console.WriteLine();
+        Console.Write("是否删除这些空文件？(y/n): ");
+        string input = Console.ReadLine();
+
+        if (input != null && input.ToLower() == "y")
+        {
+            int deleted = 0;
+            int failed = 0;
+
+            foreach (string file in emptyFiles)
+            {
+                try
+                {
+                    File.Delete(file);
+                    deleted++;
+                    Console.WriteLine($"已删除: {file}");
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Console.WriteLine($"删除失败: {file}");
+                    Console.WriteLine($"原因: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"成功删除 {deleted} 个，失败 {failed} 个");
+        }
+        else
+        {
+            Console.WriteLine("已取消。");
+        }
     }
 
-    static int FindEmptyFiles(string path)
+    static List<string> FindEmptyFiles(string path)
     {
+        List<string> result = new List<string>();
+
         if (Directory.Exists(path))
         {
-            string[] files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
-            int total = 0;
+            string[] files;
+            try
+            {
+                var options = new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true
+                };
+                files = Directory.GetFiles(path, "*", options);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"无法遍历文件夹: {path}");
+                Console.WriteLine($"原因: {ex.Message}");
+                return result;
+            }
 
             foreach (string file in files)
             {
-                total += FindEmptyFiles(file);
+                result.AddRange(FindEmptyFiles(file));
             }
-
-            return total;
+            return result;
         }
 
         if (File.Exists(path))
         {
-            if (new FileInfo(path).Length == 0)
+            try
             {
-                Console.WriteLine(path);
-                return 1;
+                if (new FileInfo(path).Length == 0)
+                {
+                    result.Add(path);
+                }
             }
-            return 0;
+            catch (Exception ex)
+            {
+                Console.WriteLine($"跳过: {path}（{ex.Message}）");
+            }
+            return result;
         }
 
-        return 0;
+        return result;
     }
 }
